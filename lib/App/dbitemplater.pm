@@ -158,6 +158,7 @@ sub process {
 			'TRIM'         => $self->{'TRIM'},
 			'START_TAG'    => $self->{'START_TAG'},
 			'END_TAG'      => $self->{'END_TAG'},
+			'ABSOLUTE'     => 1,
 		}
 	);
 
