@@ -131,7 +131,7 @@ sub new {
 							. $full_path
 							. '", is not a file or does not exist' );
 				}
-				$args{$item} = $full_path;
+				$self->{$item} = $args{$item};
 			} ## end else [ if ( $args{$item} =~ /[\\\/]/ ) ]
 		} ## end if ( $item eq 'header' || $item eq 'row' ||...)
 	} ## end foreach my $item (@possible_args)
@@ -190,6 +190,11 @@ sub process {
 	eval { $sth = $dbh->prepare( $self->{'query'} ) or die $DBI::errstr; };
 	if ($@) {
 		die( 'statement prepare failed... ' . $@ );
+	}
+
+	eval { $sth->execute or die $DBI::errstr; };
+	if ($@) {
+		die( 'statement execute failed... ' . $@ );
 	}
 
 	# fetch each row and process it
