@@ -177,7 +177,6 @@ sub process {
 	if ($@) {
 		warn( 'Error processing header template, "' . $self->{'header'} . '"... ' . $@ );
 	}
-	$results = $results . $output;
 
 	# connect to it
 	my $dbh;
