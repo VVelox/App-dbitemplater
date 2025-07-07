@@ -102,11 +102,12 @@ sub new {
 		'END_TAG'    => undef,
 		'config'     => \%args,
 	};
+	bless $self;
 
 	# ensure that all required args are present and that any arts that are present have a
 	# ref of ""
 	foreach my $item (@possible_args) {
-		if ( defined($required_args->{$item}) && !defined( $args{$item} ) ) {
+		if ( defined( $required_args->{$item} ) && !defined( $args{$item} ) ) {
 			die( '$args{"' . $item . '"} is not defined and is required' );
 		}
 		if ( defined( $args{$item} ) && ref( $args{$item} ) ne '' ) {

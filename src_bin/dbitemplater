@@ -93,3 +93,5 @@ if ($@) {
 }
 
 my $dbitemplater = App::dbitemplater->new($config);
+
+$dbitemplater->process;
