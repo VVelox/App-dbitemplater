@@ -131,7 +131,7 @@ sub new {
 							. $full_path
 							. '", is not a file or does not exist' );
 				}
-				$self->{$item} = $args{$item};
+				$self->{$item} = $full_path;
 			} ## end else [ if ( $args{$item} =~ /[\\\/]/ ) ]
 		} ## end if ( $item eq 'header' || $item eq 'row' ||...)
 	} ## end foreach my $item (@possible_args)
