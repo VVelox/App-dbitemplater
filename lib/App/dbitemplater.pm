@@ -22,9 +22,14 @@ our $VERSION = '0.0.1';
 =head1 SYNOPSIS
 
     use App::dbitemplater;
+    use YAML::XS;
+    use File::Slurp;
 
-    my $foo = App::dbitemplater->new();
-    ...
+    $config=Load(read_file('/usr/local/etc/dbitemplater.yaml'));
+
+    my $dbitemplater = App::dbitemplater->new($config);
+
+    $dbitemplater->process;
 
 =head1 METHODS
 
@@ -32,39 +37,8 @@ our $VERSION = '0.0.1';
 
 Initiates the object.
 
-Thw following arguments are accepted.
-
-    - ds :: The DBI connection string to use.
-
-    - user :: The user to use for the connection.
-
-    - pass :: The pass to use for the connection.
-
-    - output :: The file to use to the results to.
-        If undef it is printed to STDOUT.
-
-    - query :: The SQL query to run.
-
-    - header :: The header template to use.
-
-    - row :: The template to use for each returned row.
-
-    - footer :: The footer template.
-
-The required ones are below.
-
-    ds
-    header
-    row
-    footer
-
-The following will be passed to L<Template>->new.
-
-    POST_CHOMP
-    PRE_CHOMP
-    TRIM
-    START_TAG
-    END_TAG
+A hash reference is required. The contents should be the config.
+See the docs for dbitemplater for the config.
 
 =cut
 
