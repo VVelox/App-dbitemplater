@@ -70,7 +70,7 @@ if ( defined($config_file_short) ) {
 }
 
 # ensure the config file exists
-if ( -f $config_file_long ) {
+if (! -f $config_file_long ) {
 	die( 'Config file, "' . $config_file_long . '", is not a file or does not exist' );
 }
 
