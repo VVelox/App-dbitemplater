@@ -1,0 +1,95 @@
+#!perl
+
+=head1 NAME
+
+dbitemplater -  Utility for running a SQL query via DBI and using the output in a template.
+
+=head1 SYNOPSIS
+
+=head1 FLAGS
+
+=cut
+
+use strict;
+use warnings;
+use Getopt::Long qw(GetOptions);
+use Pod::Usage qw(pod2usage);
+use File::Slurp qw(read_file);
+use App::dbitemplater;
+use YAML qw(Load);
+
+sub version {
+	print "dbitemplater v. " . $App::dbitemplater::VERSION . ".\n";
+}
+
+sub help {
+	pod2usage( -exitval => 255, -verbose => 2, -output => \*STDOUT );
+}
+
+# get the commandline options
+my $help    = 0;
+my $version = 0;
+my $config_file_short;
+my $config_file_long = '/usr/local/etc/dbitemplater.yaml';
+my $print_to_stdout  = 0;
+Getopt::Long::Configure('no_ignore_case');
+Getopt::Long::Configure('bundling');
+GetOptions(
+	'version' => \$version,
+	'v'       => \$version,
+	'help'    => \$help,
+	'h'       => \$help,
+	'c=s'     => \$config_file_short,
+	'f=s'     => \$config_file_long,
+	'o'       => $print_to_stdout,
+);
+
+# print version or help if requested
+if ($help) {
+	&help;
+	exit 42;
+}
+if ($version) {
+	&version;
+	exit 42;
+}
+
+# print version or help if requested
+if ($help) {
+	&help;
+	exit 42;
+}
+if ($version) {
+	&version;
+	exit 42;
+}
+
+# if short config is specified, form the full config path
+if ( defined($config_file_short) ) {
+	$config_file_long = '/usr/local/etc/dbitemplater/' . $config_file_short . '.yaml';
+}
+
+# ensure the config file exists
+if ( -f $config_file_long ) {
+	die( 'Config file, "' . $config_file_long . '", is not a file or does not exist' );
+}
+
+# read in the config
+my $config_raw;
+eval {
+	$config_raw = read_file($config_file_long);
+};
+if ($@) {
+	die('Failed to read the config file, "'.$config_file_long.'"... '.$@);
+}
+
+# parse the config
+my $config;
+eval {
+	$config=Load($config_raw);
+};
+if ($@) {
+	die('Failed to parse the config file, "'.$config_file_long.'"... '.$@);
+}
+
+my $dbitemplater = App::dbitemplater->new($config);

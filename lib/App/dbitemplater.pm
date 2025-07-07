@@ -3,51 +3,235 @@ package App::dbitemplater;
 use 5.006;
 use strict;
 use warnings;
+use Template    ();
+use File::Slurp qw(write_file);
+use DBI         ();
 
 =head1 NAME
 
-App::dbitemplater - The great new App::dbitemplater!
+App::dbitemplater - A utility for running a SQL query via DBI and using the output in a template.
 
 =head1 VERSION
 
-Version 0.01
+Version 0.0.1
 
 =cut
 
-our $VERSION = '0.01';
-
+our $VERSION = '0.0.1';
 
 =head1 SYNOPSIS
-
-Quick summary of what the module does.
-
-Perhaps a little code snippet.
 
     use App::dbitemplater;
 
     my $foo = App::dbitemplater->new();
     ...
 
-=head1 EXPORT
+=head1 METHODS
 
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
+=head2 new
 
-=head1 SUBROUTINES/METHODS
+Initiates the object.
 
-=head2 function1
+Thw following arguments are accepted.
+
+    - ds :: The DBI connection string to use.
+
+    - user :: The user to use for the connection.
+
+    - pass :: The pass to use for the connection.
+
+    - output :: The file to use to the results to.
+        If undef it is printed to STDOUT.
+
+    - query :: The SQL query to run.
+
+    - header :: The header template to use.
+
+    - row :: The template to use for each returned row.
+
+    - footer :: The footer template.
+
+The required ones are below.
+
+    ds
+    header
+    row
+    footer
+
+The following will be passed to L<Template>->new.
+
+    POST_CHOMP
+    PRE_CHOMP
+    TRIM
+    START_TAG
+    END_TAG
 
 =cut
 
-sub function1 {
-}
+sub new {
+	my %args;
+	if ( defined( $_[1] ) ) {
+		%args = %{ $_[1] };
+	}
 
-=head2 function2
+	my @possible_args = (
+		'ds',  'user',   'pass',       'output',    'query', 'header',
+		'row', 'footer', 'POST_CHOMP', 'PRE_CHOMP', 'TRIM',  'START_TAG',
+		'END_TAG'
+	);
+	my $required_args = {
+		'ds'     => 1,
+		'header' => 1,
+		'row'    => 1,
+		'footer' => 1,
+		'query'  => 1
+	};
+
+	my $self = {
+		'ds'         => undef,
+		'user'       => undef,
+		'pass'       => undef,
+		'output'     => undef,
+		'header'     => undef,
+		'row'        => undef,
+		'footer'     => undef,
+		'POST_CHOMP' => undef,
+		'PRE_CHOMP'  => undef,
+		'TRIM'       => undef,
+		'START_TAG'  => undef,
+		'END_TAG'    => undef,
+		'config'     => \%args,
+	};
+
+	# ensure that all required args are present and that any arts that are present have a
+	# ref of ""
+	foreach my $item (@possible_args) {
+		if ( defined($required_args) && !defined( $args{$item} ) ) {
+			die( '$args{"' . $item . '"} is not defined and is required' );
+		}
+		if ( defined( $args{$item} ) && ref( $args{$item} ) ne '' ) {
+			die( '$args{"' . $item . '"} is defined and ref is "' . ref( $args{$item} ) . '" and not ""' );
+		}
+		if ( defined( $args{$item} ) ) {
+			$self->{$item} = $args{$item};
+		}
+		if ( $item eq 'header' || $item eq 'row' || $item eq 'footer' ) {
+			# if a slash is found, assume it is a full path
+			if ( $args{$item} =~ /[\\\/]/ ) {
+				if ( !-f $args{$item} ) {
+					die( '$args{"' . $item . '"}, "' . $args{$item} . '", is not a file or does not exist' );
+				}
+			} else {
+				my $full_path = '/usr/local/etc/dbitemplater/templates/' . $item . '/' . $args{$item};
+				if ( !-f $full_path ) {
+					die(      '$args{"'
+							. $item . '"}, "'
+							. $args{$item} . '","'
+							. $full_path
+							. '", is not a file or does not exist' );
+				}
+				$args{$item} = $full_path;
+			} ## end else [ if ( $args{$item} =~ /[\\\/]/ ) ]
+		} ## end if ( $item eq 'header' || $item eq 'row' ||...)
+	} ## end foreach my $item (@possible_args)
+
+	return $self;
+} ## end sub new
+
+=head2 process
+
+Connects, run the query, and processes the templates.
 
 =cut
 
-sub function2 {
-}
+sub process {
+	my $self = $_[0];
+
+	# initiate TT
+	my $tt = Template->new(
+		{
+			'INCLUDE_PATH' => '/usr/local/etc/dbitemplater/templates',
+			'EVAL_PERL'    => 1,
+			'POST_CHOMP'   => $self->{'POST_CHOMP'},
+			'PRE_CHOMP'    => $self->{'PRE_CHOMP'},
+			'TRIM'         => $self->{'TRIM'},
+			'START_TAG'    => $self->{'START_TAG'},
+			'END_TAG'      => $self->{'END_TAG'},
+		}
+	);
+
+	# stores the results of the template
+	my $results = '';
+
+	# will be passed to the template for vars
+	my $to_pass_to_template = { 'config' => $self->{config}, };
+	# process the headertemplate
+	my $output = '';
+	eval {
+		$tt->process( $self->{'header'}, $to_pass_to_template, \$output )
+			|| die $tt->error(), "\n";
+		$results = $results . $output;
+	};
+	if ($@) {
+		warn( 'Error processing header template, "' . $self->{'header'} . '"... ' . $@ );
+	}
+	$results = $results . $output;
+
+	# connect to it
+	my $dbh;
+	eval { $dbh = DBI->connect( $self->{'ds'}, $self->{'user'}, $self->{'pass'} ) or die $DBI::errstr; };
+	if ($@) {
+		die( 'DBI connect failed... ' . $@ );
+	}
+
+	# prepare the statement
+	my $sth;
+	eval { $sth = $dbh->prepare( $self->{'query'} ) or die $DBI::errstr; };
+	if ($@) {
+		die( 'statement prepare failed... ' . $@ );
+	}
+
+	# fetch each row and process it
+	while ( my $row_hash_ref = $sth->fetchrow_hashref ) {
+		$to_pass_to_template->{'row'} = $row_hash_ref;
+		# process the template for each row
+		my $output = '';
+		eval {
+			$tt->process( $self->{'row'}, $to_pass_to_template, \$output )
+				|| die $tt->error(), "\n";
+			$results = $results . $output;
+		};
+		if ($@) {
+			warn( 'Error processing header template, "' . $self->{'row'} . '"... ' . $@ );
+		}
+	} ## end while ( my $row_hash_ref = $sth->fetchrow_hashref)
+
+	# remove the row variable from what is passed to the template
+	delete( $to_pass_to_template->{'row'} );
+
+	# process the footer template
+	$output = '';
+	eval {
+		$tt->process( $self->{'footer'}, $to_pass_to_template, \$output )
+			|| die $tt->error(), "\n";
+		$results = $results . $output;
+	};
+	if ($@) {
+		warn( 'Error processing footer template, "' . $self->{'header'} . '"... ' . $@ );
+	}
+
+	# handle the output
+	if ( !defined( $self->{output} ) ) {
+		print $results;
+	} else {
+		eval { write_file( $self->{'output'}, { atomic => 1 }, $results ); };
+		if ($@) {
+			die( 'Failed to write results out to "' . $self->{'output'} . '"... ' . $@ );
+		}
+	}
+
+	return 1;
+} ## end sub process
 
 =head1 AUTHOR
 
@@ -102,4 +286,4 @@ This is free software, licensed under:
 
 =cut
 
-1; # End of App::dbitemplater
+1;    # End of App::dbitemplater

@@ -22,6 +22,7 @@ my %WriteMakefileArgs = (
 		'YAML::'      => '0',
 		'File::Slurp' => '0',
 		'Pod::Usage'  => '0',
+		'DBI'         => '0',
 	},
 	dist       => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
 	clean      => { FILES    => 'App-dbitemplater-*' },
